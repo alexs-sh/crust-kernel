@@ -1,0 +1,51 @@
+#!/bin/sh
+new_root=/new_root
+dev_root=/dev/mmcblk1p2
+ver=1.0.10
+
+echo "Crust loader:$ver"
+echo "Crust rootfs:$dev_root"
+echo "Enter 'y' to stop..."
+
+read -t 3 need_stop
+
+if [[ "$need_stop" == "y" ]]; then
+  
+  echo "Starting service mode"
+  mount -t devtmpfs devtmpfs /dev
+  mount -t sysfs sysfs /sys
+
+  exec 0</dev/console
+  exec 1>/dev/console
+  exec 2>/dev/console
+
+  echo "1" > /sys/class/leds/led1/brightness 
+  echo "1" > /sys/class/leds/led2/brightness 
+
+  exec /sbin/init $*
+
+else
+
+  echo "Starting initialization system..."
+  mount -t devtmpfs devtmpfs /dev
+  mount -t proc proc /proc
+  mount -t sysfs sysfs /sys
+
+  echo "1" > /sys/class/leds/led1/brightness 
+  echo "1" > /sys/class/leds/led2/brightness 
+
+  echo "Checking base system..."
+  e2fsck -y -v $dev_root
+
+  echo "Mounting base system..."
+  mkdir $new_root
+  mount -v -t ext2 $dev_root $new_root
+  mount -v --move /dev $new_root/dev
+
+  echo "Starting base system..."
+
+  echo "0" > /sys/class/leds/led1/brightness 
+  echo "0" > /sys/class/leds/led2/brightness 
+
+  exec switch_root -c /dev/console $new_root /sbin/init $*
+fi

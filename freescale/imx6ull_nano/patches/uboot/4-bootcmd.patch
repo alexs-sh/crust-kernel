@@ -1,0 +1,25 @@
+--- a/include/configs/mx6ullevk.h.orig	2018-10-18 10:37:57.327845529 +0500
++++ b/include/configs/mx6ullevk.h	2018-10-18 10:50:38.911160626 +0500
+@@ -182,18 +182,11 @@
+ 			"fi;\0" \
+ 
+ #define CONFIG_BOOTCOMMAND \
+-	   "run findfdt;" \
+ 	   "mmc dev ${mmcdev};" \
+-	   "mmc dev ${mmcdev}; if mmc rescan; then " \
+-		   "if run loadbootscript; then " \
+-			   "run bootscript; " \
+-		   "else " \
+-			   "if run loadimage; then " \
+-				   "run mmcboot; " \
+-			   "else run netboot; " \
+-			   "fi; " \
+-		   "fi; " \
+-	   "else run netboot; fi"
++	   "fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${image};" \
++	   "fatload mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${fdt_file};" \
++	   "fatload mmc ${mmcdev}:${mmcpart} ${initrd_addr} ${initrd_file};" \
++	   "bootz ${loadaddr} ${initrd_addr} ${fdt_addr};"
+ #endif
+ 
+ /* Miscellaneous configurable options */

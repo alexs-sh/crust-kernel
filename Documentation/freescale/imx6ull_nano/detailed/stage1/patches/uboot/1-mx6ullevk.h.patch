@@ -1,0 +1,40 @@
+--- a/include/configs/mx6ullevk.h	2017-09-14 19:48:51.000000000 +0500
++++ b/include/configs/mx6ullevk.h	2017-10-27 18:56:10.938599460 +0500
+@@ -112,7 +112,8 @@
+ 	"console=ttymxc0\0" \
+ 	"fdt_high=0xffffffff\0" \
+ 	"initrd_high=0xffffffff\0" \
+-	"fdt_file=undefined\0" \
++	"initrd_file=rootfs.cpio.uboot\0" \
++	"fdt_file=imx6ull-14x14-nano.dtb\0" \
+ 	"fdt_addr=0x83000000\0" \
+ 	"boot_fdt=try\0" \
+ 	"ip_dyn=yes\0" \
+@@ -181,18 +182,15 @@
+ 			"fi;\0" \
+ 
+ #define CONFIG_BOOTCOMMAND \
+-	   "run findfdt;" \
+-	   "mmc dev ${mmcdev};" \
+-	   "mmc dev ${mmcdev}; if mmc rescan; then " \
+-		   "if run loadbootscript; then " \
+-			   "run bootscript; " \
+-		   "else " \
+-			   "if run loadimage; then " \
+-				   "run mmcboot; " \
+-			   "else run netboot; " \
+-			   "fi; " \
+-		   "fi; " \
+-	   "else run netboot; fi"
++    "echo MMCDEV=${mmcdev};" \
++    "echo IMAGE=${image};" \
++    "echo INITRD=${initrd_file};" \
++    "echo FDT=${fdt_file};" \
++    "mmc dev ${mmcdev};" \
++    "fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${image};" \
++    "fatload mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${fdt_file};" \
++    "fatload mmc ${mmcdev}:${mmcpart} ${initrd_addr} ${initrd_file};" \
++    "bootz ${loadaddr} ${initrd_addr} ${fdt_addr};" 
+ #endif
+ 
+ /* Miscellaneous configurable options */

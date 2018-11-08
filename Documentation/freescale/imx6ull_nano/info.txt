@@ -1,0 +1,68 @@
+Версия для Тритон-1
+===================
+
+Информация
+----------
+
+A.  DeviceTree
+	- Добавлен usb (HOST)
+	- Добавлен rtc (DS1307)
+
+B.  Ядро
+	- Добавлен rtc (DS1307)
+	- Добавлен ntfs 
+
+C.  INITRD
+	- Добавлен ntfs-3g 
+
+D.  Характеристики
+	- Загрузка 3.5 сек
+ 	- Память в initrd: 22 Mб
+	- Нет SD UHS
+ 
+Сборка
+------
+
+1. Скачать и распаковать buildbot
+2. Скопировать конфиги
+3. Выбрать конфиг для imx6ull и собрать
+
+    wget https://buildroot.org/downloads/buildroot-2018.02.7.tar.gz
+    tar xf  buildroot-2018.02.7.tar.gz
+    cp -r freescale/imx6ull_nano/* buildroot-2018.02.7
+    cd buildroot-2018.02.7
+    make imx6ull_nano_defconfig
+    make
+
+Разметка
+--------
+
+Раздел №1: загрузочный в формате fat32. Cодержит:
+zImage - ядро
+imx6ull-nano.dtb - DeviceTree устройства
+rootfs.cpio.uboot - образ сервисной системы
+Раздел №2: опциональный для размещения основной системы
+Пример записи загрузчика на носитель с именем mmcblk0
+
+    dd if=u-boot.imx of=/dev/mmcblk0 bs=512 seek=2
+
+Настройка загрузчика
+--------------------
+
+Загрузка с SD-карты
+Полный вариант. Применяется, если на устройство не прошито или был загрузчик с неизвестными параметрами
+    setenv mmcdev 0
+    setenv mmcroot /dev/mmcblk0p2 rootwait rw
+    setenv initrd_file rootfs.cpio.uboot
+    setenv fdt_file imx6ull-nano.dtb
+    fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${image}
+    fatload mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${fdt_file}
+    fatload mmc ${mmcdev}:${mmcpart} ${initrd_addr} ${initrd_file}
+    bootz ${loadaddr} ${initrd_addr} ${fdt_addr}
+   
+Короткий вариант. Если устройство было прошито актуальным загрузчиком и требуется только изменить источник загрузки
+    setenv mmcdev 0
+    setenv mmcroot /dev/mmcblk0p2 rootwait rw
+    boot
+ 
+

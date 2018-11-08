@@ -1,0 +1,73 @@
+#!/bin/sh
+new_root=/new_root
+int_root=/dev/mmcblk1p2
+ext_root=/dev/mmcblk0p2
+ver=2.0.1
+
+echo ""
+echo "Crust loader:$ver"
+echo "Please select boot mode (1 by default):"
+echo "1 - internal ($int_root)"
+echo "2 - external ($ext_root)"
+echo "3 - service"
+echo ""
+
+read -t 3 input
+
+if [[ "$input" == "3" ]]; then
+  
+  echo "Booting in service mode..."
+  mount -t devtmpfs devtmpfs /dev
+  mount -t sysfs sysfs /sys
+
+  exec 0</dev/console
+  exec 1>/dev/console
+  exec 2>/dev/console
+
+  echo "1" > /sys/class/leds/led1/brightness 
+  echo "1" > /sys/class/leds/led2/brightness 
+
+  exec /sbin/init $*
+
+elif [[ "$input" == "2" ]]; then
+  echo "Booting system from external storage..."
+  echo "Mounting devices..."
+  mount -t devtmpfs devtmpfs /dev
+  mount -t proc proc /proc
+  mount -t sysfs sysfs /sys
+
+  echo "Mounting root..."
+  mkdir $new_root
+  mount -v -t ext2 $ext_root $new_root
+  mount -v --move /dev $new_root/dev
+
+  echo "Switching to new system..."
+  exec switch_root -c /dev/console $new_root /sbin/init $*
+
+else
+
+  echo "Booting system from internal storage..."
+  echo "Mounting devices..."
+  mount -t devtmpfs devtmpfs /dev
+  mount -t proc proc /proc
+  mount -t sysfs sysfs /sys
+
+  echo "1" > /sys/class/leds/led1/brightness 
+  echo "1" > /sys/class/leds/led2/brightness 
+
+  echo "Checking filesystem..."
+  e2fsck -y -v $int_root
+
+  echo "Mounting root..."
+  mkdir $new_root
+  mount -v -t ext2 $int_root $new_root
+  mount -v --move /dev $new_root/dev
+
+  echo "Starting base system..."
+
+  echo "0" > /sys/class/leds/led1/brightness 
+  echo "0" > /sys/class/leds/led2/brightness 
+
+  echo "Switching to new system..."
+  exec switch_root -c /dev/console $new_root /sbin/init $*
+fi
