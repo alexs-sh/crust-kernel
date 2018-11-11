@@ -1,0 +1,10 @@
+--- a/include/configs/mx6ullevk.h	2018-10-18 10:34:51.541183272 +0500
++++ b/include/configs/mx6ullevk.h	2018-10-18 10:35:54.701181769 +0500
+@@ -112,6 +112,7 @@
+ 	"console=ttymxc0\0" \
+ 	"fdt_high=0xffffffff\0" \
+ 	"initrd_high=0xffffffff\0" \
++	"initrd_file=rootfs.cpio.uboot\0" \
+ 	"fdt_file=imx6ull-nano.dtb\0" \
+ 	"fdt_addr=0x83000000\0" \
+ 	"boot_fdt=try\0" \
