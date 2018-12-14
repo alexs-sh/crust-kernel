@@ -1,0 +1,140 @@
+diff -Naur a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+--- a/drivers/net/ethernet/freescale/fec.h	2017-09-07 14:46:46.000000000 +0500
++++ b/drivers/net/ethernet/freescale/fec.h	2017-11-13 21:04:14.000000000 +0500
+@@ -580,6 +580,7 @@
+ 	struct delayed_work time_keep;
+ 	struct regulator *reg_phy;
+ 	struct pm_qos_request pm_qos_req;
++	int phy_reset_gpio;
+ 
+ 	unsigned int tx_align;
+ 	unsigned int rx_align;
+diff -Naur a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+--- a/drivers/net/ethernet/freescale/fec_main.c	2017-09-07 14:46:46.000000000 +0500
++++ b/drivers/net/ethernet/freescale/fec_main.c	2017-11-13 21:04:14.000000000 +0500
+@@ -2895,6 +2895,20 @@
+ 	return false;
+ }
+ 
++static void fec_reset_phy(struct platform_device *pdev)
++{
++        struct net_device *ndev = platform_get_drvdata(pdev);
++        struct fec_enet_private *fep = netdev_priv(ndev);
++        
++        /* check GPIO valid to avoid kernel print warning when no gpio reset */
++        if (gpio_is_valid(fep->phy_reset_gpio)) {
++                gpio_set_value(fep->phy_reset_gpio, 0);
++                msleep(1);
++                gpio_set_value(fep->phy_reset_gpio, 1);
++                msleep(5);
++        }
++}
++
+ static int
+ fec_enet_open(struct net_device *ndev)
+ {
+@@ -2935,6 +2949,9 @@
+ 	phy_start(ndev->phydev);
+ 	netif_tx_start_all_queues(ndev);
+ 
++	/* reset phy */
++	fec_reset_phy(fep->pdev);
++
+ 	if ((id_entry->driver_data & FEC_QUIRK_BUG_WAITMODE) &&
+ 	    !fec_enet_irq_workaround(fep))
+ 		pm_qos_add_request(&fep->pm_qos_req,
+@@ -3328,58 +3345,6 @@
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_OF
+-static int fec_reset_phy(struct platform_device *pdev)
+-{
+-	int err, phy_reset;
+-	bool active_high = false;
+-	int msec = 1;
+-	struct device_node *np = pdev->dev.of_node;
+-
+-	if (!np)
+-		return 0;
+-
+-	err = of_property_read_u32(np, "phy-reset-duration", &msec);
+-	/* A sane reset duration should not be longer than 1s */
+-	if (!err && msec > 1000)
+-		msec = 1;
+-
+-	phy_reset = of_get_named_gpio(np, "phy-reset-gpios", 0);
+-	if (phy_reset == -EPROBE_DEFER)
+-		return phy_reset;
+-	else if (!gpio_is_valid(phy_reset))
+-		return 0;
+-
+-	active_high = of_property_read_bool(np, "phy-reset-active-high");
+-
+-	err = devm_gpio_request_one(&pdev->dev, phy_reset,
+-			active_high ? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
+-			"phy-reset");
+-	if (err) {
+-		dev_err(&pdev->dev, "failed to get phy-reset-gpios: %d\n", err);
+-		return err;
+-	}
+-
+-	if (msec > 20)
+-		msleep(msec);
+-	else
+-		usleep_range(msec * 1000, msec * 1000 + 1000);
+-
+-	gpio_set_value_cansleep(phy_reset, !active_high);
+-
+-	return 0;
+-}
+-#else /* CONFIG_OF */
+-static int fec_reset_phy(struct platform_device *pdev)
+-{
+-	/*
+-	 * In case of platform probe, the reset has been done
+-	 * by machine code.
+-	 */
+-	return 0;
+-}
+-#endif /* CONFIG_OF */
+-
+ static void
+ fec_enet_get_queue_num(struct platform_device *pdev, int *num_tx, int *num_rx)
+ {
+@@ -3512,6 +3477,16 @@
+ 
+ 	fec_enet_of_parse_stop_mode(pdev);
+ 
++        fep->phy_reset_gpio = of_get_named_gpio(np, "phy-reset-gpios", 0);
++        if (gpio_is_valid(fep->phy_reset_gpio)) {
++    		int err = devm_gpio_request_one(&pdev->dev, fep->phy_reset_gpio,
++                                    GPIOF_OUT_INIT_HIGH, "phy-reset");
++    		if (err) {
++            	    dev_err(&pdev->dev, "failed to get phy-reset-gpios: %d\n", err);
++            	    fep->phy_reset_gpio = -1;
++    		}
++	}
++
+ 	if (of_get_property(np, "fsl,magic-packet", NULL))
+ 		fep->wol_flag |= FEC_WOL_HAS_MAGIC_PACKET;
+ 
+@@ -3607,10 +3582,6 @@
+ 	pm_runtime_set_active(&pdev->dev);
+ 	pm_runtime_enable(&pdev->dev);
+ 
+-	ret = fec_reset_phy(pdev);
+-	if (ret)
+-		goto failed_reset;
+-
+ 	if (fep->bufdesc_ex)
+ 		fec_ptp_init(pdev);
+ 
+@@ -3687,7 +3658,6 @@
+ 	fec_ptp_stop(pdev);
+ 	if (fep->reg_phy)
+ 		regulator_disable(fep->reg_phy);
+-failed_reset:
+ 	pm_runtime_put(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ failed_regulator:
